@@ -1,0 +1,328 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>⭐ Mis Puntos — ProfePoints</title>
+<link href="https://fonts.googleapis.com/css2?family=Nunito:wght@400;600;700;800;900&display=swap" rel="stylesheet"/>
+<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore-compat.js"></script>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:'Nunito',sans-serif;background:#F0F4FF;min-height:100vh;color:#1e293b}
+
+/* ── SEARCH SCREEN ── */
+#search-screen{
+  min-height:100vh;display:flex;flex-direction:column;align-items:center;
+  justify-content:center;padding:24px 16px;
+  background:linear-gradient(160deg,#1e293b 0%,#312e81 60%,#4338CA 100%);
+}
+.logo-wrap{display:flex;flex-direction:column;align-items:center;margin-bottom:32px}
+.logo-icon{font-size:64px;animation:float 4s ease-in-out infinite}
+@keyframes float{0%,100%{transform:translateY(0)}50%{transform:translateY(-8px)}}
+.app-title{font-size:32px;font-weight:900;color:#fff;margin-top:8px;letter-spacing:-1px}
+.app-sub{font-size:14px;color:#a5b4fc;margin-top:4px;font-weight:600}
+
+.search-card{
+  background:#fff;border-radius:24px;padding:28px 24px;
+  width:100%;max-width:440px;box-shadow:0 24px 64px rgba(0,0,0,.35)
+}
+.search-card h2{font-size:17px;font-weight:800;color:#1e293b;margin-bottom:14px;text-align:center}
+.search-wrap{position:relative;margin-bottom:12px}
+.search-wrap span{position:absolute;left:14px;top:50%;transform:translateY(-50%);font-size:18px;pointer-events:none}
+.search-input{
+  width:100%;border:2.5px solid #e2e8f0;border-radius:14px;
+  padding:13px 14px 13px 46px;font-size:16px;font-family:'Nunito',sans-serif;
+  outline:none;transition:border-color .2s,box-shadow .2s;background:#F8FAFF
+}
+.search-input:focus{border-color:#6366F1;box-shadow:0 0 0 4px rgba(99,102,241,.12)}
+.student-list{display:flex;flex-direction:column;gap:6px;max-height:300px;overflow-y:auto}
+.student-item{
+  display:flex;align-items:center;gap:12px;padding:10px 14px;
+  border-radius:14px;cursor:pointer;transition:all .15s;border:2px solid transparent
+}
+.student-item:hover,.student-item:active{background:#EEF2FF;border-color:#6366F1}
+.av{width:40px;height:40px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:900;color:#fff;flex-shrink:0}
+.student-info{flex:1;min-width:0}
+.student-name{font-weight:800;font-size:14px}
+.student-course{font-size:11px;color:#64748b;font-weight:600;margin-top:1px}
+.student-pts{font-weight:900;font-size:14px;color:#6366F1;background:#EEF2FF;padding:4px 10px;border-radius:20px;white-space:nowrap}
+.no-results{text-align:center;color:#94a3b8;padding:20px;font-size:14px}
+.loading-msg{text-align:center;color:#94a3b8;padding:20px;font-size:14px}
+
+/* ── PROFILE SCREEN ── */
+#profile-screen{display:none;min-height:100vh;padding-bottom:48px}
+.profile-header{
+  background:linear-gradient(160deg,#1e293b 0%,#312e81 55%,#4338CA 100%);
+  padding:20px 20px 72px;position:relative;overflow:hidden
+}
+.profile-header::after{
+  content:'';position:absolute;bottom:-1px;left:0;right:0;
+  height:32px;background:#F0F4FF;border-radius:32px 32px 0 0
+}
+.back-btn{
+  display:inline-flex;align-items:center;gap:6px;color:#c7d2fe;
+  background:rgba(255,255,255,.1);border:1px solid rgba(255,255,255,.2);
+  border-radius:12px;padding:8px 16px;font-size:13px;font-weight:700;
+  cursor:pointer;font-family:'Nunito',sans-serif;margin-bottom:24px;transition:all .2s
+}
+.back-btn:hover{background:rgba(255,255,255,.2);color:#fff}
+.p-av{
+  width:96px;height:96px;border-radius:50%;display:flex;align-items:center;
+  justify-content:center;font-size:32px;font-weight:900;color:#fff;
+  border:4px solid rgba(255,255,255,.3);box-shadow:0 8px 32px rgba(0,0,0,.3);margin:0 auto
+}
+.p-name{text-align:center;font-size:24px;font-weight:900;color:#fff;margin-top:12px}
+.p-course{text-align:center;font-size:13px;color:#a5b4fc;margin-top:3px;font-weight:600}
+
+.cards-row{
+  display:grid;grid-template-columns:1fr 1fr;gap:12px;
+  padding:0 16px;margin-top:-44px;margin-bottom:24px;position:relative;z-index:1
+}
+.stat-card{
+  background:#fff;border-radius:20px;padding:18px 12px;text-align:center;
+  box-shadow:0 4px 20px rgba(0,0,0,.1)
+}
+.stat-num{font-size:32px;font-weight:900;line-height:1}
+.stat-lbl{font-size:10px;font-weight:800;color:#64748b;text-transform:uppercase;margin-top:6px;letter-spacing:.05em}
+
+.section{padding:0 16px;margin-bottom:20px}
+.section-title{font-size:11px;font-weight:900;color:#64748b;text-transform:uppercase;letter-spacing:.08em;margin-bottom:12px}
+
+/* Points breakdown */
+.pts-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.pt-card{background:#fff;border-radius:18px;padding:16px;box-shadow:0 2px 12px rgba(0,0,0,.07)}
+.pt-icon{font-size:26px;margin-bottom:6px}
+.pt-val{font-size:26px;font-weight:900;line-height:1}
+.pt-lbl{font-size:12px;color:#64748b;font-weight:700;margin-top:2px}
+.pt-bar-wrap{background:#f1f5f9;border-radius:6px;height:6px;margin-top:10px;overflow:hidden}
+.pt-bar{height:6px;border-radius:6px;transition:width .8s cubic-bezier(.4,0,.2,1)}
+
+/* Prizes */
+.prize-list{display:flex;flex-direction:column;gap:10px}
+.prize-card{
+  background:#fff;border-radius:18px;padding:14px 16px;
+  box-shadow:0 2px 12px rgba(0,0,0,.07);display:flex;align-items:center;gap:14px
+}
+.prize-emoji-wrap{
+  width:52px;height:52px;border-radius:14px;display:flex;align-items:center;
+  justify-content:center;font-size:28px;flex-shrink:0;background:#F8FAFF
+}
+.prize-info{flex:1;min-width:0}
+.prize-name{font-weight:800;font-size:14px}
+.prize-desc{font-size:12px;color:#64748b;margin-top:2px}
+.prize-badge{
+  padding:6px 12px;border-radius:20px;font-size:12px;font-weight:900;white-space:nowrap;flex-shrink:0
+}
+.badge-ok{background:#DCFCE7;color:#065F46}
+.badge-no{background:#FEE2E2;color:#991B1B}
+
+@media(min-width:520px){
+  .cards-row{padding:0 24px;grid-template-columns:repeat(3,1fr)}
+  .section{padding:0 24px}
+  .pts-grid{grid-template-columns:repeat(4,1fr)}
+}
+</style>
+</head>
+<body>
+
+<!-- SEARCH SCREEN -->
+<div id="search-screen">
+  <div class="logo-wrap">
+    <div class="logo-icon">⭐</div>
+    <div class="app-title">ProfePoints</div>
+    <div class="app-sub">Buscá tu nombre y mirá tus puntos</div>
+  </div>
+  <div class="search-card">
+    <h2>¿Quién sos?</h2>
+    <div class="search-wrap">
+      <span>🔍</span>
+      <input class="search-input" id="searchInput" type="text"
+        placeholder="Escribí tu nombre..."
+        oninput="filterStudents(this.value)"
+        autocomplete="off" autofocus/>
+    </div>
+    <div class="student-list" id="studentList">
+      <div class="loading-msg">⏳ Cargando datos...</div>
+    </div>
+  </div>
+</div>
+
+<!-- PROFILE SCREEN -->
+<div id="profile-screen">
+  <div class="profile-header">
+    <button class="back-btn" onclick="goBack()">← Volver</button>
+    <div class="p-av" id="pAv"></div>
+    <div class="p-name" id="pName"></div>
+    <div class="p-course" id="pCourse"></div>
+  </div>
+
+  <div class="cards-row">
+    <div class="stat-card">
+      <div class="stat-num" id="pTotal" style="color:#6366F1">0</div>
+      <div class="stat-lbl">⭐ Puntos totales</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-num" id="pSpent" style="color:#EF4444">0</div>
+      <div class="stat-lbl">💸 Canjeados</div>
+    </div>
+    <div class="stat-card" style="grid-column:1/-1" id="balanceCard">
+      <div class="stat-num" id="pBalance" style="color:#10B981">0</div>
+      <div class="stat-lbl">💰 Saldo disponible</div>
+    </div>
+  </div>
+
+  <div class="section">
+    <div class="section-title">✨ Mis puntos por categoría</div>
+    <div class="pts-grid" id="ptsGrid"></div>
+  </div>
+
+  <div class="section" id="prizesSection">
+    <div class="section-title">🎁 Premios disponibles</div>
+    <div class="prize-list" id="prizeList"></div>
+  </div>
+</div>
+
+<script>
+// ── FIREBASE CONFIG ──────────────────────────────────────────────────────────
+const FIREBASE_CONFIG = {
+  apiKey:            "AIzaSyCuKdbAZc004rWzqdJKnBBwnCwkx1yzudg",
+  authDomain:        "profepoints.firebaseapp.com",
+  projectId:         "profepoints",
+  storageBucket:     "profepoints.firebasestorage.app",
+  messagingSenderId: "558519806479",
+  appId:             "1:558519806479:web:e1254e7ba349a7e2d4d17a"
+};
+
+const PT = [
+  {id:'participacion',label:'Participación',icon:'🙋',color:'#3B82F6'},
+  {id:'tareas',label:'Tareas',icon:'📚',color:'#10B981'},
+  {id:'comportamiento',label:'Comportamiento',icon:'⭐',color:'#F59E0B'},
+  {id:'personalizado',label:'Personalizado',icon:'🎯',color:'#8B5CF6'},
+];
+const AVC=['#6366F1','#EC4899','#14B8A6','#F97316','#8B5CF6','#06B6D4','#84CC16','#EF4444'];
+
+let APP = {courses:[], students:[], prizes:[], canjes:[]};
+let currentStudentId = null;
+
+// ── HELPERS ──────────────────────────────────────────────────────────────────
+function avInit(n){return n.split(' ').map(w=>w[0]||'').join('').slice(0,2).toUpperCase()||'?';}
+function avColor(n){return AVC[n.charCodeAt(0)%AVC.length];}
+function totalPts(s){return PT.reduce((a,t)=>a+(s.points?.[t.id]||0),0);}
+function totalSpent(sid){return APP.canjes.filter(c=>c.studentId===sid).reduce((a,c)=>a+(c.pts||0),0);}
+function balance(s){return totalPts(s)-totalSpent(s.id);}
+function esc(s){return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');}
+
+// ── FIREBASE ─────────────────────────────────────────────────────────────────
+firebase.initializeApp(FIREBASE_CONFIG);
+const db = firebase.firestore();
+
+db.collection('profepoints').doc('data').onSnapshot(function(doc){
+  if(doc.exists){
+    const data = doc.data();
+    APP.courses  = data.courses  || [];
+    APP.students = data.students || [];
+    APP.prizes   = data.prizes   || [];
+    APP.canjes   = data.canjes   || [];
+    filterStudents(document.getElementById('searchInput').value);
+    if(currentStudentId) showProfile(currentStudentId);
+  }
+  document.getElementById('studentList').innerHTML = '<div class="no-results">No hay datos aún.</div>';
+}, function(err){
+  document.getElementById('studentList').innerHTML = '<div class="no-results">⚠️ Error al conectar.</div>';
+});
+
+// ── SEARCH ───────────────────────────────────────────────────────────────────
+function filterStudents(v){
+  const q = v.trim().toLowerCase();
+  const list = document.getElementById('studentList');
+  const sorted = [...APP.students].sort((a,b)=>totalPts(b)-totalPts(a));
+  const filtered = q ? sorted.filter(s=>s.name.toLowerCase().includes(q)) : sorted;
+  if(!filtered.length){
+    list.innerHTML = q
+      ? '<div class="no-results">😕 No se encontró "'+esc(v)+'"</div>'
+      : '<div class="loading-msg">⏳ Cargando...</div>';
+    return;
+  }
+  list.innerHTML = filtered.slice(0,15).map(function(s){
+    const course = APP.courses.find(c=>c.id===s.courseId);
+    return '<div class="student-item" onclick="showProfile(\''+s.id+'\')">'+
+      '<div class="av" style="background:'+avColor(s.name)+'">'+avInit(s.name)+'</div>'+
+      '<div class="student-info">'+
+        '<div class="student-name">'+esc(s.name)+'</div>'+
+        '<div class="student-course">'+(course?esc(course.name):'')+'</div>'+
+      '</div>'+
+      '<div class="student-pts">'+totalPts(s)+' pts</div>'+
+    '</div>';
+  }).join('');
+}
+
+// ── PROFILE ──────────────────────────────────────────────────────────────────
+function showProfile(sid){
+  currentStudentId = sid;
+  const s = APP.students.find(st=>st.id===sid);
+  if(!s) return;
+  const course = APP.courses.find(c=>c.id===s.courseId);
+  const pts   = totalPts(s);
+  const spent = totalSpent(sid);
+  const bal   = balance(s);
+
+  // Header
+  const av = document.getElementById('pAv');
+  av.textContent = avInit(s.name);
+  av.style.background = avColor(s.name);
+  document.getElementById('pName').textContent = s.name;
+  document.getElementById('pCourse').textContent = course ? '📚 '+course.name : '';
+  document.getElementById('pTotal').textContent   = pts;
+  document.getElementById('pSpent').textContent   = spent;
+  document.getElementById('pBalance').textContent = bal;
+
+  // On wider screens show 3 cols, hide the spanning trick
+  document.getElementById('balanceCard').style.gridColumn = '';
+
+  // Points breakdown
+  const maxP = Math.max(...PT.map(t=>(s.points||{})[t.id]||0), 1);
+  document.getElementById('ptsGrid').innerHTML = PT.map(function(t){
+    const val = (s.points||{})[t.id]||0;
+    const pct = Math.round(val/maxP*100);
+    return '<div class="pt-card">'+
+      '<div class="pt-icon">'+t.icon+'</div>'+
+      '<div class="pt-val" style="color:'+t.color+'">'+val+'</div>'+
+      '<div class="pt-lbl">'+t.label+'</div>'+
+      '<div class="pt-bar-wrap"><div class="pt-bar" style="width:'+pct+'%;background:'+t.color+'"></div></div>'+
+    '</div>';
+  }).join('');
+
+  // Prizes
+  if(APP.prizes && APP.prizes.length){
+    document.getElementById('prizeList').innerHTML = APP.prizes.map(function(p){
+      const canAfford = bal >= p.cost;
+      return '<div class="prize-card">'+
+        '<div class="prize-emoji-wrap">'+(p.emoji||'🎁')+'</div>'+
+        '<div class="prize-info">'+
+          '<div class="prize-name">'+esc(p.name)+'</div>'+
+          (p.desc?'<div class="prize-desc">'+esc(p.desc)+'</div>':'')+
+        '</div>'+
+        '<span class="prize-badge '+(canAfford?'badge-ok':'badge-no')+'">'+
+          p.cost+' pts '+(canAfford?'✓':'✗')+
+        '</span>'+
+      '</div>';
+    }).join('');
+    document.getElementById('prizesSection').style.display = '';
+  } else {
+    document.getElementById('prizesSection').style.display = 'none';
+  }
+
+  document.getElementById('search-screen').style.display  = 'none';
+  document.getElementById('profile-screen').style.display = 'block';
+  window.scrollTo(0,0);
+}
+
+function goBack(){
+  currentStudentId = null;
+  document.getElementById('profile-screen').style.display = 'none';
+  document.getElementById('search-screen').style.display  = 'flex';
+}
+</script>
+</body>
+</html>
