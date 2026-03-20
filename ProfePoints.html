@@ -235,10 +235,11 @@ function initFirebase(){
   try{
     firebase.initializeApp(FIREBASE_CONFIG);
     db = firebase.firestore();
+    var docRef = db.collection('profepoints').doc('data');
     // Escuchar cambios en tiempo real
-    db.collection('profepoints').doc('data').onSnapshot(function(doc){
+    docRef.onSnapshot(function(doc){
       if(doc.exists){
-        const data = doc.data();
+        var data = doc.data();
         ['courses','students','groups','prizes','canjes','ptAmount'].forEach(function(k){
           if(data[k] !== undefined) S[k] = data[k];
         });
@@ -246,8 +247,16 @@ function initFirebase(){
         if(!S.ptAmount) S.ptAmount = 10;
         render();
         setSS('☁️ sincronizado','#10b981');
+      } else {
+        // El documento no existe todavía — lo creamos con los datos locales
+        var data = {};
+        ['courses','students','groups','prizes','canjes','ptAmount'].forEach(function(k){ data[k]=S[k]; });
+        docRef.set(data)
+          .then(function(){ setSS('☁️ guardado','#10b981'); })
+          .catch(function(){ setSS('⚠️ error al crear','#EF4444'); });
       }
     }, function(err){
+      console.warn('Firestore error:', err);
       setSS('⚠️ sin conexión','#F59E0B');
     });
     setSS('☁️ conectando...','#94a3b8');
@@ -482,13 +491,46 @@ function addPrize(){
   const desc=document.getElementById('np-desc').value.trim();
   const cost=parseInt(document.getElementById('np-cost').value)||0;
   if(!name){alert('Ingresá un nombre para el premio');return;}
-  S.prizes.push({id:uid(),emoji,name,desc,cost});
+  const editingId=document.getElementById('np-editing-id').value;
+  if(editingId){
+    // Editing existing prize
+    const p=S.prizes.find(x=>x.id===editingId);
+    if(p){p.emoji=emoji;p.name=name;p.desc=desc;p.cost=cost;}
+  } else {
+    // Adding new prize
+    S.prizes.push({id:uid(),emoji,name,desc,cost});
+  }
   save();render();
 }
 function delPrize(id){
   if(!confirm('¿Eliminar este premio?'))return;
   S.prizes=S.prizes.filter(p=>p.id!==id);
   save();render();
+}
+function editPrize(id){
+  const p=S.prizes.find(x=>x.id===id);
+  if(!p)return;
+  document.getElementById('np-emoji').value=p.emoji||'';
+  document.getElementById('np-name').value=p.name||'';
+  document.getElementById('np-desc').value=p.desc||'';
+  document.getElementById('np-cost').value=p.cost||'';
+  // Mark form as editing
+  document.getElementById('np-editing-id').value=id;
+  document.getElementById('np-save-btn').textContent='💾 Guardar cambios';
+  document.getElementById('np-cancel-btn').style.display='inline-block';
+  document.getElementById('add-prize-title').textContent='✏️ Editar premio';
+  // Scroll to form
+  document.getElementById('add-prize-form').scrollIntoView({behavior:'smooth',block:'center'});
+}
+function cancelEditPrize(){
+  document.getElementById('np-editing-id').value='';
+  document.getElementById('np-emoji').value='';
+  document.getElementById('np-name').value='';
+  document.getElementById('np-desc').value='';
+  document.getElementById('np-cost').value='';
+  document.getElementById('np-save-btn').textContent='✅ Guardar premio';
+  document.getElementById('np-cancel-btn').style.display='none';
+  document.getElementById('add-prize-title').textContent='➕ Agregar premio';
 }
 
 // ─── CANJE MODAL ─────────────────────────────────────────────────────────────
@@ -1228,19 +1270,26 @@ function renderPrizes(){
         <div style="font-size:13px;color:#64748b;margin-top:2px">${esc(p.desc)}</div>
         <div style="font-size:14px;font-weight:800;color:#6366F1;margin-top:4px">⭐ ${p.cost} pts</div>
       </div>
-      <button onclick="delPrize('${p.id}')" style="background:none;border:none;color:#fca5a5;font-size:15px;cursor:pointer;padding:4px">🗑</button>
+      <div style="display:flex;flex-direction:column;gap:4px">
+        <button onclick="editPrize('${p.id}')" style="background:none;border:none;color:#94a3b8;font-size:15px;cursor:pointer;padding:4px" title="Editar">✏️</button>
+        <button onclick="delPrize('${p.id}')" style="background:none;border:none;color:#fca5a5;font-size:15px;cursor:pointer;padding:4px" title="Eliminar">🗑</button>
+      </div>
     </div>`).join('');
   return `<h2 class="section-title">🎁 Gestión de Premios</h2>
   <div class="prize-grid">${cards}</div>
-  <div class="add-prize-form">
-    <h3 style="font-size:15px;font-weight:800;color:#1e293b;margin-bottom:14px">➕ Agregar premio</h3>
+  <div class="add-prize-form" id="add-prize-form">
+    <h3 id="add-prize-title" style="font-size:15px;font-weight:800;color:#1e293b;margin-bottom:14px">➕ Agregar premio</h3>
+    <input type="hidden" id="np-editing-id" value=""/>
     <div class="form-row">
       <div><div class="form-label">Emoji</div><input id="np-emoji" class="form-input" placeholder="🎁" maxlength="4"/></div>
       <div><div class="form-label">Nombre *</div><input id="np-name" class="form-input" placeholder="Ej: Tiempo libre"/></div>
     </div>
     <div style="margin-bottom:10px"><div class="form-label">Descripción</div><input id="np-desc" class="form-input" placeholder="Ej: 10 minutos para hacer lo que quieras"/></div>
     <div style="margin-bottom:14px"><div class="form-label">Costo en puntos *</div><input id="np-cost" class="form-input" type="number" min="1" placeholder="20" style="max-width:160px"/></div>
-    <button class="btn-solid" style="background:#6366F1" onclick="addPrize()">✅ Guardar premio</button>
+    <div style="display:flex;gap:10px;flex-wrap:wrap">
+      <button id="np-save-btn" class="btn-solid" style="background:#6366F1" onclick="addPrize()">✅ Guardar premio</button>
+      <button id="np-cancel-btn" onclick="cancelEditPrize()" style="display:none;background:#fff;border:2px solid #e2e8f0;border-radius:10px;padding:9px 18px;font-weight:700;font-size:14px;color:#64748b;cursor:pointer">✕ Cancelar</button>
+    </div>
   </div>`;
 }
 
